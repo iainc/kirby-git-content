@@ -299,9 +299,12 @@ class KirbyGitHelper
             return null;
         }
 
+        $gitName = trim((string)$user->content()->get('gitName')->value());
+        $gitEmail = trim((string)$user->content()->get('gitEmail')->value());
+
         return [
-            'name' => (string)$user->name()->or($user->email()),
-            'email' => (string)$user->email(),
+            'name' => $gitName !== '' ? $gitName : (string)$user->name()->or($user->email()),
+            'email' => $gitEmail !== '' ? $gitEmail : (string)$user->email(),
         ];
     }
 
