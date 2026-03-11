@@ -97,15 +97,39 @@ class KirbyGitHelper
                 $this->getRepo()->execute('add', '--', ...$uniquePaths);
             }
 
-            $params = [];
-            if ($author) {
-                $params[] = "--author=" . $author;
-            }
-
-            $this->getRepo()->commit($commitMessage, $params);
+            $this->getRepo()->run(...$this->buildCommitCommand($commitMessage, $author));
         } catch (GitException $e) {
 			$this->catchGitException($e);
         }
+    }
+
+    private function buildCommitCommand(string $commitMessage, ?array $author): array
+    {
+        $command = [];
+
+        if ($author !== null) {
+            $command[] = '-c';
+            $command[] = 'user.name=' . $author['name'];
+            $command[] = '-c';
+            $command[] = 'user.email=' . $author['email'];
+        }
+
+        $command[] = 'commit';
+
+        if ($author) {
+            $command[] = '--author=' . $this->formatAuthorString($author);
+        }
+
+        $command[] = [
+            '-m' => $commitMessage,
+        ];
+
+        return $command;
+    }
+
+    private function formatAuthorString(array $author): string
+    {
+        return $author['name'] . " <" . $author['email'] . ">";
     }
 
 	private function catchGitException(GitException $e) {
@@ -269,13 +293,25 @@ class KirbyGitHelper
         ];
     }
 
-    public function getAuthorString(): ?string
+    public function getAuthorIdentity(): ?array
     {
         if (!$user = $this->kirby->user()) {
             return null;
         }
 
-        return $user->name()->or($user->email()) . " <" . $user->email() . ">";
+        return [
+            'name' => (string)$user->name()->or($user->email()),
+            'email' => (string)$user->email(),
+        ];
+    }
+
+    public function getAuthorString(): ?string
+    {
+        if (!$author = $this->getAuthorIdentity()) {
+            return null;
+        }
+
+        return $this->formatAuthorString($author);
     }
 
     public function kirbyChange($action, $item, $paths, $url = '')
@@ -288,7 +324,7 @@ class KirbyGitHelper
             }
 
             if ($this->commitOnChange) {
-                $author = $this->getAuthorString();
+                $author = $this->getAuthorIdentity();
 
                 $this->commit($this->commitMessage($action, $item, $url), $paths, $author);
             }

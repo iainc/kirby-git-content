@@ -77,7 +77,7 @@ return [
 
                 $git = new KirbyGitHelper();
                 $git->addAll();
-                $git->commit($message, null, $git->getAuthorString());
+                $git->commit($message, null, $git->getAuthorIdentity());
 
                 return true;
             }
