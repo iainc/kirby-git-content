@@ -45,6 +45,15 @@ class KirbyGit
                     return $kirbyGit->httpGitHelperAction('fetch', "successfully fetched remote changes");
                 },
             ],
+            [
+                'pattern' => 'git-content/sync',
+                'method'  => 'POST',
+                'action'  => function () use ($kirbyGit) {
+                    $sha = kirby()->request()->get('sha');
+                    $branch = kirby()->request()->get('branch');
+                    return $kirbyGit->httpGitHelperAction('sync', null, [$sha, $branch]);
+                },
+            ],
 			[
                 'pattern' => 'git-content/reset',
                 'method'  => 'POST',
@@ -86,6 +95,7 @@ class KirbyGit
             if ($secret !== '') {
                 $passedSecret = kirby()->request()->get('secret', '');
                 if ($passedSecret !== $secret) {
+                    Header::forbidden();
                     return [
                         'status' => 'forbidden',
                         'message' => 'Invalid secret passed',
@@ -98,6 +108,10 @@ class KirbyGit
                     return $helper->httpGitHelperAction('push', "successfully pushed the content folder");
                 case "pull":
                     return $helper->httpGitHelperAction('pull', "successfully pulled the content folder");
+                case "sync":
+                    $sha = kirby()->request()->get('sha');
+                    $branch = kirby()->request()->get('branch');
+                    return $helper->httpGitHelperAction('sync', null, [$sha, $branch]);
                 case "reset":
                     if (!$secret) {
                         return [
@@ -120,13 +134,13 @@ class KirbyGit
         return [$route];
     }
 
-    public function httpGitHelperAction(string $action, ?string $successMessage = null)
+    public function httpGitHelperAction(string $action, ?string $successMessage = null, array $arguments = [])
     {
         try {
             kirby()->trigger('thathoff.git-content.' . $action . ':before');
 
             // when no $successMessage is provided, the response of the $action call is returned
-            $response = $this->gitHelper->$action();
+            $response = $this->gitHelper->$action(...$arguments);
 
             kirby()->trigger('thathoff.git-content.' . $action . ':after', ['response' => $response]);
 

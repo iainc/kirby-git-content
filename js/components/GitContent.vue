@@ -6,6 +6,13 @@
       <k-box :text="helpText" html="true" theme="info" />
     </section>
 
+    <section class="k-section" v-if="isConflictBranch">
+      <p class="k-git-content-conflict-note" data-theme="negative">
+        <k-icon type="alert" />
+        <span>{{ conflictStatus.text }}</span>
+      </p>
+    </section>
+
     <k-section
       v-if="status.files.length"
       :buttons="changeButtons"
@@ -65,16 +72,39 @@ export default {
   },
   computed: {
     differsFromRemote() {
-      return this.status.diffFromOrigin !== 0;
+      return this.aheadOfOrigin > 0 || this.behindOfOrigin > 0;
+    },
+    aheadOfOrigin() {
+      return typeof this.status.aheadOfOrigin === "number"
+        ? this.status.aheadOfOrigin
+        : 0;
+    },
+    behindOfOrigin() {
+      return typeof this.status.behindOfOrigin === "number"
+        ? this.status.behindOfOrigin
+        : 0;
+    },
+    conflictBranch() {
+      return this.status.conflictBranch || {
+        isActive: false,
+        name: null,
+        baseBranch: null,
+      };
+    },
+    isConflictBranch() {
+      return this.conflictBranch.isActive === true;
     },
     buttonMap() {
       return {
         revert: true,
         commit: true,
-        pull: true,
+        fetch: true,
+        sync: true,
         push: true,
+        reset: true,
         createBranch: true,
         switchBranch: true,
+        removeIndexLock: true,
         ...this.buttons,
       };
     },
@@ -139,11 +169,11 @@ export default {
         	class: "btn-fetch",
         },
         {
-          key: "pull",
-          text: "Pull",
-          icon: "download",
-          click: this.pull,
-          class: "btn-pull",
+          key: "sync",
+          text: "Sync",
+          icon: "sync",
+          click: this.sync,
+          class: "btn-sync",
         },
         {
           key: "push",
@@ -164,7 +194,11 @@ export default {
 				});
       }
 
-      const filteredButtons = buttons.filter((button) => this.buttonMap[button.key]);
+      let filteredButtons = buttons.filter((button) => this.buttonMap[button.key]);
+
+      if (this.isConflictBranch) {
+        filteredButtons = filteredButtons.filter((button) => button.key === "sync");
+      }
 
       if (this.hasIndexLock) {
         filteredButtons.unshift({
@@ -179,7 +213,7 @@ export default {
       return filteredButtons;
     },
     branchButtons() {
-      if (this.disableBranchManagement) {
+      if (this.disableBranchManagement || this.isConflictBranch) {
         return [];
       }
 
@@ -202,36 +236,57 @@ export default {
 
       return buttons.filter((button) => this.buttonMap[button.key]);
     },
+    conflictStatus() {
+      const baseBranch = this.conflictBranch.baseBranch || "the original branch";
+
+      return {
+        text:
+          `Conflict branch ${this.branch} is active. `
+          + `New commits stay on this branch. `
+          + `Resolve it manually and merge it into ${baseBranch}.`,
+      };
+    },
     remoteStatus() {
       if (!this.status.hasRemote) {
         return {
-          text: "No remote branch found.",
-          theme: "negative",
+          text: `No remote branch yet for ${this.branch}. Sync will create origin/${this.branch}.`,
+          theme: "notice",
         };
       }
 
-      if (this.status.diffFromOrigin === 0) {
+      if (this.aheadOfOrigin === 0 && this.behindOfOrigin === 0) {
         return {
           text: "Your branch is up to date with origin/" + this.branch,
           theme: "positive",
         };
       }
 
-      const absDiff = Math.abs(this.status.diffFromOrigin);
+      if (this.aheadOfOrigin > 0 && this.behindOfOrigin > 0) {
+        return {
+          text:
+            `Your branch has diverged from origin/${this.branch} by `
+            + `${this.aheadOfOrigin} ahead and ${this.behindOfOrigin} behind.`,
+          theme: "notice",
+        };
+      }
 
       return {
         text: `Your branch is ${
-          this.status.diffFromOrigin > 0 ? "ahead" : "behind"
-        } of origin/${this.branch} by ${absDiff} commit${
-          absDiff !== 1 ? "s" : ""
+          this.aheadOfOrigin > 0 ? "ahead" : "behind"
+        } of origin/${this.branch} by ${
+          this.aheadOfOrigin > 0 ? this.aheadOfOrigin : this.behindOfOrigin
+        } commit${
+          (this.aheadOfOrigin > 0 ? this.aheadOfOrigin : this.behindOfOrigin) !== 1 ? "s" : ""
         }.`,
         theme: "notice",
       };
     },
   },
   methods: {
-    pull: async function () {
-      await panel.app.$api.post("/git-content/pull");
+    sync: async function () {
+      await panel.app.$api.post("/git-content/sync", {
+        branch: this.branch,
+      });
       this.$reload();
     },
     push: async function () {
@@ -269,3 +324,19 @@ export default {
   },
 };
 </script>
+<style>
+.k-git-content-conflict-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--color-red-500);
+}
+
+.k-git-content-conflict-note .k-icon {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+  color: currentColor;
+}
+</style>
