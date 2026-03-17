@@ -559,6 +559,7 @@ class KirbyGitHelper
     {
         return strtr($this->commitMessageTemplate, [
             ':action:' => $action,
+            ':capitalized-action:' => ucfirst($action),
             ':item:' => $item,
             ':url:' => $url,
         ]);
