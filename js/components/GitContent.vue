@@ -213,18 +213,11 @@ export default {
       return filteredButtons;
     },
     branchButtons() {
-      if (this.disableBranchManagement || this.isConflictBranch) {
+      if (this.disableBranchManagement) {
         return [];
       }
 
       const buttons = [
-        {
-          key: "createBranch",
-          text: "Create Branch",
-          icon: "add",
-          click: this.createBranch,
-          class: "btn-create",
-        },
         {
           key: "switchBranch",
           text: "Switch Branch",
@@ -233,6 +226,16 @@ export default {
           class: "btn-switch",
         },
       ];
+
+      if (!this.isConflictBranch) {
+        buttons.unshift({
+          key: "createBranch",
+          text: "Create Branch",
+          icon: "add",
+          click: this.createBranch,
+          class: "btn-create",
+        });
+      }
 
       return buttons.filter((button) => this.buttonMap[button.key]);
     },
